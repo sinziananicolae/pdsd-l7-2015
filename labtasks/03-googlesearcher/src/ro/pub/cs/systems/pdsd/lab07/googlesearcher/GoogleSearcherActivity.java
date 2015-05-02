@@ -1,5 +1,15 @@
 package ro.pub.cs.systems.pdsd.lab07.googlesearcher;
 
+import java.io.IOException;
+
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.http.impl.client.DefaultHttpClient;
+
+import ro.pub.cs.systems.pdsd.lab07.googlesearcher.general.Constants;
 import android.app.Activity;
 import android.os.Bundle;
 import android.view.Menu;
@@ -8,6 +18,7 @@ import android.view.View;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Toast;
 
 public class GoogleSearcherActivity extends Activity {
 	
@@ -25,6 +36,28 @@ public class GoogleSearcherActivity extends Activity {
 		@Override
 		public void run() {
 			
+			HttpClient httpClient = new DefaultHttpClient();
+			HttpGet httpGet = new HttpGet(Constants.GOOGLE_INTERNET_ADDRESS + keyword);
+			ResponseHandler<String> responseHandler = new BasicResponseHandler();
+			
+			final String response;
+			try {
+				response = httpClient.execute(httpGet, responseHandler);
+				if (response != null){
+					googleResultsWebView.post(new Runnable() {
+						
+						@Override
+						public void run() {
+							googleResultsWebView.loadDataWithBaseURL(Constants.GOOGLE_INTERNET_ADDRESS, response, "text/html", "UTF-8", null);
+							
+						}
+					});
+				}
+			} catch (ClientProtocolException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 			// TODO: exercise 6b)
 			// create an instance of a HttpClient object
 			// create an instance of a HttpGet object, encapsulating the base Internet address (http://www.google.com) and the keyword
@@ -45,6 +78,14 @@ public class GoogleSearcherActivity extends Activity {
 		
 		@Override
 		public void onClick(View view) {
+			String keyWord = keywordEditText.getText().toString();
+			if (keyWord == null || keyWord.isEmpty()) {
+				Toast.makeText(getApplication(), Constants.EMPTY_KEYWORD_ERROR_MESSAGE, Toast.LENGTH_LONG).show();
+				return;
+			}
+			
+			keyWord = keyWord.replace(" ", "+");
+			new GoogleSearcherThread(Constants.SEARCH_PREFIX + keyWord).start();
 			
 			// TODO: exercise 6a)
 			// obtain the keyword from keywordEditText
