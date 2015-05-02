@@ -1,8 +1,26 @@
 package ro.pub.cs.systems.pdsd.lab07.calculatorwebservice.graphicaluserinterface;
 
+import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.protocol.HTTP;
+
 import ro.pub.cs.systems.pdsd.lab07.calculatorwebservice.R;
 import android.app.Activity;
 import android.os.Bundle;
+import ro.pub.cs.systems.pdsd.lab07.calculatorwebservice.general.Constants;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -10,6 +28,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class CalculatorWebServiceActivity extends Activity {
 	
@@ -44,6 +63,78 @@ public class CalculatorWebServiceActivity extends Activity {
 			// e) execute the request, thus generating the result
 			
 			// display the result in resultTextView
+			
+			String errorMessage = null;
+			
+			String operator1 = operator1EditText.getText().toString(); 
+			String operator2 = operator2EditText.getText().toString(); 
+			if (operator1 == null || operator1.isEmpty() || operator2 == null || operator2.isEmpty()) {
+				errorMessage = Constants.ERROR_MESSAGE_EMPTY;
+			}
+			
+			if (errorMessage != null) {
+				final String finalizedErrorMessage = errorMessage;
+				resultTextView.post(new Runnable() {
+					
+					@Override
+					public void run() {
+						resultTextView.setText(finalizedErrorMessage);
+					}
+				});
+				return;
+			}
+			
+			String result = null;
+			HttpClient myHttpClient = new DefaultHttpClient();
+			switch (methodsSpinner.getSelectedItemPosition()) {
+				case Constants.GET_OPERATION:
+					HttpGet httpGet = new HttpGet(Constants.GET_WEB_SERVICE_ADDRESS
+                            + "?" + Constants.OPERATION_ATTRIBUTE + "=" + operationsSpinner.getSelectedItem().toString()
+                            + "&" + Constants.OPERATOR1_ATTRIBUTE + "=" + operator1
+                            + "&" + Constants.OPERATOR2_ATTRIBUTE + "=" + operator2);
+					ResponseHandler<String> responseHandlerGet = new BasicResponseHandler();
+					try {
+						result = myHttpClient.execute(httpGet, responseHandlerGet);
+					} catch (ClientProtocolException e) {
+						e.printStackTrace();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					break;
+				case Constants.POST_OPERATION:
+					HttpPost httpPost = new HttpPost(Constants.POST_WEB_SERVICE_ADDRESS);
+					List<NameValuePair> params = new ArrayList<NameValuePair>();        
+					params.add(new BasicNameValuePair(Constants.OPERATION_ATTRIBUTE, operationsSpinner.getSelectedItem().toString()));
+					params.add(new BasicNameValuePair(Constants.OPERATOR1_ATTRIBUTE, operator1));
+					params.add(new BasicNameValuePair(Constants.OPERATOR2_ATTRIBUTE, operator2));
+					UrlEncodedFormEntity urlEncodedFormEntity;
+					try {
+						urlEncodedFormEntity = new UrlEncodedFormEntity(params, HTTP.UTF_8);
+						httpPost.setEntity(urlEncodedFormEntity);
+					} catch (UnsupportedEncodingException e) {
+						e.printStackTrace();
+					}
+					ResponseHandler<String> responseHandlerPost = new BasicResponseHandler();
+					try {
+						result = myHttpClient.execute(httpPost, responseHandlerPost);
+					} catch (ClientProtocolException e) {
+						e.printStackTrace();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+					break;
+			}
+			
+			final String finalizedResult = result;
+			resultTextView.post(new Runnable() {
+				
+				@Override
+				public void run() {
+					resultTextView.setText(finalizedResult);
+					
+				}
+			});
+			
 			
 		}
 	}
