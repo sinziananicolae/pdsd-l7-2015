@@ -1,9 +1,25 @@
 package ro.pub.cs.systems.pdsd.lab07.xkcdcartoondisplayer.graphicuserinterface;
 
+import java.io.IOException;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.ResponseHandler;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.BasicResponseHandler;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+
 import ro.pub.cs.systems.pdsd.lab07.xkcdcartoondisplayer.R;
 import ro.pub.cs.systems.pdsd.lab07.xkcdcartoondisplayer.entities.XkcdCartoonInfo;
 import ro.pub.cs.systems.pdsd.xkcdcartoondisplayer.general.Constants;
 import android.app.Activity;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.Menu;
@@ -41,6 +57,59 @@ public class XkcdCartoonDisplayerActivity extends Activity {
 			
 			XkcdCartoonInfo xkcdCartoonInfo = new XkcdCartoonInfo();
 			
+			HttpClient httpClient = new DefaultHttpClient();
+			HttpGet httpGet = new HttpGet(urls[0]);
+			ResponseHandler<String> responseHandlerGet = new BasicResponseHandler();
+			String pageSourceCode = null;
+			
+			try {
+				pageSourceCode = httpClient.execute(httpGet, responseHandlerGet);
+			} catch (ClientProtocolException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			
+			if (pageSourceCode != null) {
+				// obtinerea documentului html ce descrie continutul paginii Internet solicitate
+				Document document = Jsoup.parse(pageSourceCode);
+				Element htmlTag = document.child(0);
+				
+				// obtinerea titlului caricaturii
+				Element divTagIdCtitle = htmlTag.getElementsByAttributeValue(Constants.ID_ATTRIBUTE, Constants.CTITLE_VALUE).first();
+				xkcdCartoonInfo.setCartoonTitle(divTagIdCtitle.ownText());
+				
+				// obtinerea URL-ului imaginii care trebuie afisata 
+				Element divTagIdComic = htmlTag.getElementsByAttributeValue(Constants.ID_ATTRIBUTE, Constants.COMIC_VALUE).first();
+				String cartoonInternetAddress = divTagIdComic.getElementsByTag(Constants.IMG_TAG).attr(Constants.SRC_ATTRIBUTE);
+				
+				// obtinerea caricaturii, pe baza adresei Internet la care este gazduita
+				try {
+					String cartoonUrl = Constants.HTTP_PROTOCOL + cartoonInternetAddress;
+					HttpGet httpCartoonGet = new HttpGet(cartoonUrl);
+					HttpResponse httpGetResponse = httpClient.execute(httpCartoonGet);
+					HttpEntity httpGetEntity = httpGetResponse.getEntity();
+					if (httpGetEntity != null){
+						xkcdCartoonInfo.setCartoonContent(BitmapFactory.decodeStream(httpGetEntity.getContent()));
+					}
+					xkcdCartoonInfo.setCartoonUrl(cartoonUrl);
+				} catch (ClientProtocolException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+				
+				// obtinerea adreselor Internet corespunzatoare caricaturilor anterioara, respectiv urmatoare
+				Element aTagRelPrev = htmlTag.getElementsByAttributeValue(Constants.REL_ATTRIBUTE, Constants.PREVIOUS_VALUE).first();
+				String previousCartoonInternetAddress = Constants.XKCD_INTERNET_ADDRESS + aTagRelPrev.attr(Constants.HREF_ATTRIBUTE);
+				previousButton.setOnClickListener(new XkcdCartoonUrlButtonClickListener(previousCartoonInternetAddress));
+				 
+				Element aTagRelNext = htmlTag.getElementsByAttributeValue(Constants.REL_ATTRIBUTE, Constants.NEXT_VALUE).first();
+				String nextCartoonInternetAddress = Constants.XKCD_INTERNET_ADDRESS + aTagRelNext.attr(Constants.HREF_ATTRIBUTE);
+				nextButton.setOnClickListener(new XkcdCartoonUrlButtonClickListener(nextCartoonInternetAddress));
+			}
+			
+			
 			// TODO: exercise 5a)
 			// 1. obtain the content of the web page (whose Internet address is stored in urls[0])
 			// - create an instance of a HttpClient object
@@ -73,6 +142,23 @@ public class XkcdCartoonDisplayerActivity extends Activity {
 		
 		@Override
 		protected void onPostExecute(XkcdCartoonInfo xkcdCartoonInfo) {
+			
+			if (xkcdCartoonInfo != null) {
+				String cartoonTitle = xkcdCartoonInfo.getCartoonTitle();
+				if (cartoonTitle != null){
+					xkcdCartoonTitleTextView.setText(cartoonTitle);
+				}
+				
+				Bitmap cartoonImage = xkcdCartoonInfo.getCartoonContent();
+				if (cartoonImage != null) {
+					xkcdCartoonImageView.setImageBitmap(cartoonImage);
+				}
+				
+				String cartoonUrl = xkcdCartoonInfo.getCartoonUrl();
+				if (cartoonUrl != null) {
+					xkcdCartoonUrlTextView.setText(cartoonUrl);
+				}
+			}
 			
 			// TODO: exercise 5b)
 			// map each member of xkcdCartoonInfo object to the corresponding widget
